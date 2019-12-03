@@ -1,60 +1,55 @@
-FROM ubuntu:18.10
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+FROM centos:centos7
 
-ARG ZEPPELIN_VERSION="0.8.2"
-ARG SPARK_VERSION="2.4.4"
-ARG HADOOP_VERSION="2.7"
-
-LABEL maintainer "gusdohdock"
-LABEL zeppelin.version=${ZEPPELIN_VERSION}
-LABEL spark.version=${SPARK_VERSION}
-LABEL hadoop.version=${HADOOP_VERSION}
-
-# Install Java and some tools
-RUN apt-get -y update &&\
-    apt-get -y install curl less &&\
-    apt-get install -y openjdk-8-jdk &&\
-    apt-get -y install vim
-
-
-##########################################
-# SPARK
-##########################################
-ARG SPARK_ARCHIVE=http://artfiles.org/apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
-RUN mkdir /usr/local/spark &&\
-    mkdir /tmp/spark-events    # log-events for spark history server
+ENV SPARK_PROFILE 2.4
+ENV SPARK_VERSION 2.4.0
+ENV HADOOP_PROFILE 2.7
 ENV SPARK_HOME /usr/local/spark
 
-ENV PATH $PATH:${SPARK_HOME}/bin
-RUN curl -s ${SPARK_ARCHIVE} | tar -xz -C  /usr/local/spark --strip-components=1
+# Update the image with the latest packages
+RUN yum update -y; yum clean all
+
+# Get utils
+RUN yum install -y \
+wget \
+tar \
+curl \
+&& \
+yum clean all
+
+# Remove old jdk
+RUN yum remove java; yum remove jdk
+
+# install jdk7
+RUN yum install -y java-1.7.0-openjdk-devel
+ENV JAVA_HOME /usr/lib/jvm/java
+ENV PATH $PATH:$JAVA_HOME/bin
+
+# install spark
+RUN curl -s http://www.apache.org/dist/spark/spark-$SPARK_VERSION/spark-$SPARK_VERSION-bin-hadoop$HADOOP_PROFILE.tgz | tar -xz -C /usr/local/
+RUN cd /usr/local && ln -s spark-$SPARK_VERSION-bin-hadoop$HADOOP_PROFILE spark
+
+# update boot script
+COPY entrypoint.sh /etc/entrypoint.sh
+RUN chown root.root /etc/entrypoint.sh
+RUN chmod 700 /etc/entrypoint.sh
 
 COPY spark-defaults.conf ${SPARK_HOME}/conf/
 
-
-
-
-##########################################
-# Zeppelin
-##########################################
-RUN mkdir /usr/zeppelin &&\
-    curl -s http://mirror.softaculous.com/apache/zeppelin/zeppelin-${ZEPPELIN_VERSION}/zeppelin-${ZEPPELIN_VERSION}-bin-all.tgz | tar -xz -C /usr/zeppelin
-RUN echo '{ "allow_root": true }' > /root/.bowerrc
-
-ENV ZEPPELIN_PORT 8080
-#EXPOSE $ZEPPELIN_PORT
-
-ENV ZEPPELIN_HOME /usr/zeppelin/zeppelin-${ZEPPELIN_VERSION}-bin-all
-ENV ZEPPELIN_CONF_DIR $ZEPPELIN_HOME/conf
-ENV ZEPPELIN_NOTEBOOK_DIR $ZEPPELIN_HOME/notebook
-
-RUN mkdir -p $ZEPPELIN_HOME \
-  && mkdir -p $ZEPPELIN_HOME/logs \
-  && mkdir -p $ZEPPELIN_HOME/run
-
-
-
-# my WorkDir
-RUN mkdir /work
-WORKDIR /work
-
+#spark
 EXPOSE 8080 7077 8888 8081
-ENTRYPOINT  /usr/local/spark/sbin/start-history-server.sh; $ZEPPELIN_HOME/bin/zeppelin-daemon.sh start  && bash
+
+ENTRYPOINT ["/etc/entrypoint.sh"]

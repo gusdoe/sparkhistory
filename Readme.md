@@ -1,12 +1,12 @@
 Start the container
 
-  docker run -it -p 18080:18080 -p 8088:8080 -d gusdohdock/sparkhistory
+  docker run -it -p 8080:8080 -p 7077:7077 -p 8888:8888 -p 8081:8081 -h sparkmaster --name spark_standalone spark_standalone bash;
 
 Open Zeppelin and Spark History Server
 
 In your local browser
 
-    Zeppelin: http://localhost:8088/#/
+    Zeppelin: http://localhost:8080/#/
     Spark History Server: http://localhost:18080/?showIncomplete=true
 
 Probably, you have to wait roughly 10 second until zeppelin daemon has been started, right after starting the container.
