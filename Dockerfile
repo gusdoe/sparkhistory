@@ -1,55 +1,39 @@
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-FROM centos:centos7
+# the base image is a trusted java build (https://registry.hub.docker.com/_/java/)
+# FROM java:8
 
-ENV SPARK_PROFILE 2.4
-ENV SPARK_VERSION 2.4.4
-ENV HADOOP_PROFILE 2.7
-ENV SPARK_HOME /usr/local/spark
+# MAINTAINER gus.doh@gmail.com
 
-# Update the image with the latest packages
-RUN yum update -y; yum clean all
+FROM ubuntu:18.04
 
-# Get utils
-RUN yum install -y \
-wget \
-tar \
-curl \
-&& \
-yum clean all
+ENV SPARK_HOME /opt/spark
 
-# Remove old jdk
-RUN yum remove java; yum remove jdk
+MAINTAINER gus.doh@gmail.com
 
-# install jdk7
-RUN yum install -y java-1.7.0-openjdk-devel
-ENV JAVA_HOME /usr/lib/jvm/java
-ENV PATH $PATH:$JAVA_HOME/bin
+#&&  apt-get install software-properties-common -y \
+#&&  apt-add-repository ppa:webupd8team/java -y \
+#&&  apt-get update -y \
 
-# install spark
-RUN curl -s http://www.apache.org/dist/spark/spark-$SPARK_VERSION/spark-$SPARK_VERSION-bin-hadoop$HADOOP_PROFILE.tgz | tar -xz -C /usr/local/
-RUN cd /usr/local && ln -s spark-$SPARK_VERSION-bin-hadoop$HADOOP_PROFILE spark
+####installing [software-properties-common] so that we can use [apt-add-repository] to install Java8
+RUN apt-get update -y \
+&&  apt-get install wget -y \
+&&  apt-get install openjdk-8-jdk-headless -y \
+&&  apt-get install supervisor -y
 
-# update boot script
-COPY entrypoint.sh /etc/entrypoint.sh
-RUN chown root.root /etc/entrypoint.sh
-RUN chmod 700 /etc/entrypoint.sh
 
-COPY spark-defaults.conf ${SPARK_HOME}/conf/
+####downloading & unpacking Spark 2.4.4 [prebuilt for Hadoop 2.7 and scala 2.10]
+RUN wget https://www-us.apache.org/dist/spark/spark-2.4.4/spark-2.4.4-bin-hadoop2.7.tgz \
+&&  tar -xzf spark-2.4.4-bin-hadoop2.7.tgz \
+&&  mv spark-2.4.4-bin-hadoop2.7 /opt/spark
 
-#spark
-EXPOSE 8080 7077 8888 8081
 
-ENTRYPOINT ["/etc/entrypoint.sh"]
+#####adding conf files [to be used by supervisord for running spark master/slave]
+COPY master.conf /opt/conf/master.conf
+COPY slave.conf /opt/conf/slave.conf
+#COPY spark-defaults.conf ${SPARK_HOME}/conf/
+
+
+#######exposing port 8080 for spark master UI
+EXPOSE 8080
+
+#default command: running an interactive spark shell in the local mode
+CMD ["/opt/spark/bin/spark-shell", "--master", "local[*]"]
