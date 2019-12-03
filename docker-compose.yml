@@ -1,0 +1,46 @@
+version: "2"
+
+services:
+  spark-master:
+    image: gusdohdock/sparkhistory
+    container_name: spark-master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - INIT_DAEMON_STEP=setup_spark
+      - "constraint:node==<yourmasternode>"
+  #   spark-worker-1:
+  #     image: bde2020/spark-worker:2.4.4-hadoop2.7
+  #     container_name: spark-worker-1
+  #     depends_on:
+  #       - spark-master
+  #     ports:
+  #       - "8081:8081"
+  #     environment:
+  #       - "SPARK_MASTER=spark://spark-master:7077"
+  #       - "constraint:node==<yourworkernode>"
+  zeppelin:
+    image: apache/zeppelin:0.8.2
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    volumes:
+      - ./notebook:/opt/zeppelin/notebook
+    environment:
+      CORE_CONF_fs_defaultFS: "hdfs://namenode:8020"
+      SPARK_MASTER: "spark://spark-master:7077"
+      MASTER: "spark://spark-master:7077"
+      #SPARK_SUBMIT_OPTIONS: "--jars /opt/sansa-examples/jars/sansa-examples-spark-2016-12.jar"
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      namenode:
+        condition: service_healthy
+    networks:
+      - spark-net
+
+networks:
+  spark-net:
+    external:
+      name: spark-net
